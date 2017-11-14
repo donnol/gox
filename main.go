@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -60,14 +61,20 @@ var (
 func main() {
 	// 获取 gopath
 	var gopathEnv string = os.Getenv("GOPATH")
-	gopaths := strings.Split(gopathEnv, ":")
+	var gopaths []string
+	switch runtime.GOOS {
+	case "windows":
+		gopaths = strings.Split(gopathEnv, ";")
+	default:
+		gopaths = strings.Split(gopathEnv, ":")
+	}
 	if len(gopaths) == 0 {
 		panic("please set your gopath! like: export GOPATH=/your/gopath")
 	}
 	gopath := gopaths[0]
 	fmt.Println(gopath)
 
-	// 创建目录$GOPATH/src/golang.org/x/
+	// 创建目录 $GOPATH/src/golang.org/x/
 	fileDir := filepath.Join(gopath, "src", "golang.org", "x")
 	_, err := os.Stat(fileDir)
 	if err != nil && os.IsNotExist(err) {
