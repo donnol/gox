@@ -10,26 +10,52 @@ import (
 	"sync"
 )
 
-var xList = map[string]string{
-	"tools":      "https://github.com/golang/tools",
-	"build":      "https://github.com/golang/build",
-	"sys":        "https://github.com/golang/sys",
-	"crypto":     "https://github.com/golang/crypto",
-	"net":        "https://github.com/golang/net",
-	"scratch":    "https://github.com/golang/scratch",
-	"text":       "https://github.com/golang/text",
-	"sync":       "https://github.com/golang/sync",
-	"mobile":     "https://github.com/golang/mobile",
-	"playground": "https://github.com/golang/playground",
-	"arch":       "https://github.com/golang/arch",
-	"tour":       "https://github.com/golang/tour",
-	"image":      "https://github.com/golang/image",
-	"review":     "https://github.com/golang/review",
-	"exp":        "https://github.com/golang/exp",
-	"time":       "https://github.com/golang/time",
-	"perf":       "https://github.com/golang/perf",
-	"debug":      "https://github.com/golang/debug",
-}
+var (
+	xList = map[string]string{
+		"tools":      "github.com/golang/tools",
+		"build":      "github.com/golang/build",
+		"sys":        "github.com/golang/sys",
+		"crypto":     "github.com/golang/crypto",
+		"net":        "github.com/golang/net",
+		"scratch":    "github.com/golang/scratch",
+		"text":       "github.com/golang/text",
+		"sync":       "github.com/golang/sync",
+		"mobile":     "github.com/golang/mobile",
+		"playground": "github.com/golang/playground",
+		"arch":       "github.com/golang/arch",
+		"tour":       "github.com/golang/tour",
+		"image":      "github.com/golang/image",
+		"review":     "github.com/golang/review",
+		"exp":        "github.com/golang/exp",
+		"time":       "github.com/golang/time",
+		"perf":       "github.com/golang/perf",
+		"debug":      "github.com/golang/debug",
+	}
+	toolList = map[string]string{
+		"gocode":     "github.com/nsf/gocode",
+		"gogetdoc":   "github.com/zmb3/gogetdoc",
+		"godoc":      "golang.org/x/tools/cmd/godoc",
+		"godef":      "github.com/rogpeppe/godef",
+		"guru":       "golang.org/x/tools/cmd/guru",
+		"go-outline": "github.com/ramya-rao-a/go-outline",
+		"go-symbols": "github.com/acroca/go-symbols",
+		"gorename":   "golang.org/x/tools/cmd/gorename",
+		"golint":     "github.com/golang/lint/golint",
+		// "gometalinter":  "github.com/alecthomas/gometalinter",
+		"gometalinter": "gopkg.in/alecthomas/gometalinter.v1",
+		"goreturns":    "github.com/sqs/goreturns",
+		"goimports":    "golang.org/x/tools/cmd/goimports",
+		"gotests":      "github.com/cweill/gotests",
+		"gopkgs":       "github.com/uudashr/gopkgs/cmd/gopkgs",
+		"gomodifytags": "github.com/fatih/gomodifytags",
+		"gotype-live":  "github.com/tylerb/gotype-live",
+		"impl":         "github.com/josharian/impl",
+		"dlv":          "github.com/derekparker/delve/cmd/dlv",
+		"goplay":       "github.com/haya14busa/goplay/cmd/goplay",
+		// "megacheck":     "honnef.co/go/tools/...",
+		"go-langserver": "github.com/sourcegraph/go-langserver",
+	}
+)
 
 func main() {
 	// 获取 gopath
@@ -51,6 +77,7 @@ func main() {
 		}
 	}
 
+	// 下载 x 包
 	wg := new(sync.WaitGroup)
 	for key, link := range xList {
 		file := filepath.Join(fileDir, key)
@@ -65,7 +92,7 @@ func main() {
 					defer wg.Done()
 					err = cloneGox(fileDir, link)
 					if err != nil {
-						fmt.Printf("clone gox failed, link: %s, err: %v\n", link, err)
+						fmt.Printf("=== clone gox failed, link: %s, err: %v\n", link, err)
 					}
 				}(fileDir, link)
 			}
@@ -76,7 +103,7 @@ func main() {
 				defer wg.Done()
 				err = cloneGox(fileDir, link)
 				if err != nil {
-					fmt.Printf("clone gox failed, link: %s, err: %v\n", link, err)
+					fmt.Printf("=== clone gox failed, link: %s, err: %v\n", link, err)
 				}
 			}(fileDir, link)
 		} else {
@@ -86,12 +113,26 @@ func main() {
 				defer wg.Done()
 				err = pullGox(file, link)
 				if err != nil {
-					fmt.Printf("pull gox failed, link: %s, err: %v\n", link, err)
+					fmt.Printf("=== pull gox failed, link: %s, err: %v\n", link, err)
 				}
 			}(file, link)
 		}
 	}
 
+	wg.Wait()
+
+	// 安装工具
+	for _, tool := range toolList {
+		wg.Add(1)
+		go func(tool string) {
+			defer wg.Done()
+			err := downloadGox(tool)
+			if err != nil {
+				fmt.Printf("=== download %s failed, err: %v\n", tool, err)
+				return
+			}
+		}(tool)
+	}
 	wg.Wait()
 }
 
@@ -103,11 +144,13 @@ func cloneGox(file, link string) error {
 	}
 
 	// git clone [link]
+	link = "https://" + link
 	fmt.Printf("begin clone '%s'\n", link)
 	cmd := exec.Command("git", "clone", link)
-	output, err := cmd.Output()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s\n", output)
 		return err
 	}
 	fmt.Printf("finish clone '%s'\n", link)
@@ -123,14 +166,31 @@ func pullGox(file, link string) error {
 	}
 
 	// git pull
+	link = "https://" + link
 	fmt.Printf("begin pull '%s'\n", link)
 	cmd := exec.Command("git", "pull")
-	output, err := cmd.Output()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("%s\n", output)
 		return err
 	}
 	fmt.Printf("finish pull '%s'\n", link)
+
+	return nil
+}
+
+func downloadGox(link string) error {
+	// go get -u [link]
+	fmt.Printf("begin go get -u '%s'\n", link)
+	cmd := exec.Command("go", "get", "-u", link)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("finish go get -u '%s'\n", link)
 
 	return nil
 }
