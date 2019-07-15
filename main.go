@@ -60,7 +60,7 @@ var (
 
 func main() {
 	// 获取 gopath
-	var gopathEnv string = os.Getenv("GOPATH")
+	var gopathEnv = os.Getenv("GOPATH")
 	var gopaths []string
 	switch runtime.GOOS {
 	case "windows":
